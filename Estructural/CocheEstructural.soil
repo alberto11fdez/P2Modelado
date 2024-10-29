@@ -1,0 +1,62 @@
+!new Coche('c1')
+!c1.fechaMatriculacion := 100
+!new Coche('c2')
+!c2.fechaMatriculacion := 200
+
+!new Ciudad('Malaga')
+!new Ciudad('Sevilla')
+!new Ciudad('Cordoba')
+
+!new TallerNoOficial('TallerNO1')
+!new TallerOficial('TallerO1')
+!TallerO1.timepoGarantia := 200
+!new TallerNoOficial('TallerNO2')
+!new TallerNoOficial('TallerNO3')
+
+
+!new Recorrido ('Recorrido1') between (Sevilla, Malaga)
+!Recorrido1.km := 200
+!new Recorrido ('Recorrido2') between (Sevilla, Cordoba)
+!Recorrido2.km := 300
+!new Recorrido ('Recorrido3') between (Cordoba, Malaga)
+!Recorrido3.km := 400
+!new Recorrido('Recorrido4') between(Malaga, Sevilla)
+!Recorrido4.km := 205
+
+!new Clock('Clock')
+!insert (Clock, c1) into Time
+!insert (Clock, c2) into Time
+
+!new Viaje('v1')
+!insert(v1, R1) into ViajeCiudadOrigen
+!v1.fechaSalida := 1
+!v1.fechaLlegada := 2
+!new Viaje('v2')
+!insert(v2, R2) into ViajeCiudadOrigen
+!v2.fechaSalida := 3
+
+
+!new Revision('r1')
+!insert(r1, TallerO1) into RevisionEnTaller
+!r1.fechaInicio := 101
+!r1.fechaFin := null
+!r1.tipo := TipoRevision::Mantenimiento
+
+
+
+!insert(TallerO1, Malaga) into TallerOficialCiudad
+!insert(TallerNO1, Sevilla) into TallerNoOficialCiudad
+!insert(TallerNO2, Malaga) into TallerNoOficialCiudad
+!insert(TallerNO3, Malaga) into TallerNoOficialCiudad
+
+!insert(c1, v1) into ViajeDelCoche
+!insert(c2, v2) into ViajandoCoche
+
+!insert(v1, Recorrido1) into ViajeCiudadOrigen
+!insert(v2, Recorrido2) into ViajeCiudadOrigen
+
+!insert (c1, r1) into CocheEnRevision
+!insert (Malaga, c1) into CiudadEnCoche
+!insert(Cordoba, c2) into CiudadEnCoche
+
+

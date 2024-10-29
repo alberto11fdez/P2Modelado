@@ -1,0 +1,188 @@
+model Coches
+
+class Ciudad
+end
+
+class Clock 
+  attributes
+    NOW : Integer init = 0 -- POSIX representation starting at 0
+    resolution: Integer init = 1 
+  operations
+    tick() 
+      begin
+        self.NOW:=self.NOW + self.resolution;
+        for o in self.ao do 
+            o.tick()
+        end;
+      end
+      post TimePasses: self.NOW = self.NOW@pre + self.resolution
+    run (n:Integer)
+      begin
+        for i in Sequence{1..n} do
+          self.tick()
+        end 
+      end
+  constraints
+    inv PositiveResolution: self.resolution > 0
+end
+
+abstract class ActiveObject -- real-time objects 
+  operations
+    tick() begin end 
+end
+
+association Time between 
+  Clock [1] 
+  ActiveObject [*] role ao ordered
+end
+
+
+class Coche < ActiveObject
+attributes
+    fechaMatriculacion : Integer
+    kmRecorridos : Integer derive: self.viaje-> collect(v|v.kmDelViaje)->sum()
+    enGarantia : Boolean derive: (self.fechaMatriculacion + 400 >= self.clock.NOW) or (
+        if self.revision->sortedBy(fechaFin)->last().taller.oclIsTypeOf(TallerOficial) 
+            then self.revision->sortedBy(fechaFin)->last().taller.oclAsType(TallerOficial).timepoGarantia >= self.clock.NOW
+        else
+            false
+        endif
+    )
+    necesitaMantenimiento : Boolean derive: (self.fechaMatriculacion + 400 < self.clock.NOW) or (self.revision -> sortedBy(fechaFin)-> last().fechaFin + 100 < self.clock.NOW)
+end
+
+class Viaje
+attributes
+    fechaSalida : Integer
+    fechaLlegada : Integer init: null
+    kmDelViaje : Integer derive: self.recorrido.km
+end
+
+enum TipoRevision{Mantenimiento, Reparacion}
+class Revision
+attributes
+    fechaInicio : Integer
+    fechaFin :Integer
+    tipo : TipoRevision
+end
+
+abstract class Taller
+end
+
+class TallerNoOficial < Taller
+end
+
+class TallerOficial < Taller
+attributes
+    timepoGarantia : Integer
+end
+
+associationclass Recorrido between
+    Ciudad [*] role origen
+    Ciudad [*] role destino
+attributes
+    km : Integer
+end
+
+association ViajeDelCoche between
+    Coche [0..1] role coche
+    Viaje [0..*] role viaje
+end
+
+association ViajandoCoche between
+    Coche [0..1] role enCoche
+    Viaje [0..1] role enViaje
+end
+
+association ViajeCiudadOrigen between
+    Viaje [*] role viaje 
+    Recorrido [1] role recorrido 
+end
+
+association CocheEnRevision between
+    Coche [0..1] role enCoche
+    Revision [0..1] role enRevision
+end
+
+association RevisionesDelCoche between
+    Coche [0..1] role coche
+    Revision [*] role revision
+end
+
+
+association TallerOficialCiudad between
+    TallerOficial [0..1] role tallerOficial
+    Ciudad [1] role ciudadTallerOficial
+end
+
+association TallerNoOficialCiudad between
+    TallerNoOficial [0..*] role tallerNoOficial
+    Ciudad [1] role ciudadTallerNoOficial
+end
+
+
+association RevisionEnTaller between
+    Revision [0..*] role revision
+    Taller [1] role taller
+end
+
+association CiudadEnCoche between
+    Ciudad [0..1] role ciudad
+    Coche [0..*] role coche
+end
+
+
+constraints
+
+
+context Recorrido inv NoMenosDe5KmEntreCiudades:
+    self.km > 5
+
+context Coche inv DespuesDeMatricularElCoche:
+    (self.revision->size() > 0 implies self.revision->forAll(r| r.fechaInicio > self.fechaMatriculacion)) or (self.enRevision.fechaInicio > self.fechaMatriculacion)
+
+context Coche inv ViajeCompletado:
+    self.viaje -> forAll(v | v.fechaSalida > 0 and v.fechaLlegada > v.fechaSalida)
+
+context Coche inv ViajeNoCompleto:
+    self.enViaje -> size() > 0 implies self.enViaje.fechaSalida > 0 and self.enViaje.fechaLlegada = null
+
+context Coche inv FechaRevisionesCompletasOK:
+    self.revision -> size() > 0 implies self.revision -> forAll(r1 | r1.fechaInicio < r1.fechaFin and r1.fechaInicio > 0) 
+
+context Coche inv FechaRevisionesNoCompletasOK:
+    self.enRevision -> size() > 0 implies self.enRevision.fechaFin = null and self.enRevision.fechaInicio > 0
+
+context Coche inv NoCoincidirViajes:
+    self.viaje -> size() > 1 implies self.viaje -> forAll(v1, v2 | v1 <> v2 implies v1.fechaSalida < v1.fechaLlegada and  v1.fechaLlegada <= v2.fechaSalida and v2.fechaSalida < v2.fechaLlegada)
+
+context Coche inv NoMantenimientoSiEnViajeOAlReves:
+    (self.enRevision -> size() > 0 implies self.enViaje -> size() = 0) and (self.enViaje->size() > 0 implies self.enRevision ->size() = 0)
+
+context Coche inv NuevoViajeDespuesDelUltimo:
+    self.enViaje -> size() > 0  and self.viaje -> size() >0 implies self.viaje -> sortedBy(v| v.fechaLlegada)->last().fechaLlegada <= self.enViaje.fechaSalida
+
+context Recorrido inv CiudadesDistintas:
+    self.origen <> self.destino
+
+
+context Coche inv CiudadEnLaQueEstaElCocheSiNoEstaEnViajeYHaRealizadoMinUno:
+    self.enViaje -> size() = 0 and self.viaje -> size() > 0 implies self.viaje -> sortedBy(v| v.fechaLlegada)->last().recorrido.destino = self.ciudad
+
+context Coche inv CiudadesCoherentes:
+    self.viaje -> size() > 1 implies self.viaje -> sortedBy(v| v.fechaLlegada)->forAll(v1, v2 | v1 <> v2 implies v1.recorrido.destino = v2.recorrido.origen)
+
+
+context Coche inv MismaCiudadQueRevisionTaller:
+    self.enRevision -> size() > 0 implies (
+        if self.enRevision.taller.oclIsTypeOf(TallerOficial) 
+            then self.enRevision.taller.oclAsType(TallerOficial).ciudadTallerOficial = self.ciudad 
+        else 
+            self.enRevision.taller.oclAsType(TallerNoOficial).ciudadTallerNoOficial = self.ciudad
+        endif
+    )
+
+
+
+
+
